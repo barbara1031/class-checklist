@@ -14,7 +14,7 @@
     import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 1. 請替換為您的 Firebase 專屬金鑰
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+ // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyBWyQkQ3maeT1fLTXzeENC00TdOWEfZ0MM",
   authDomain: "class-checklist-acbb3.firebaseapp.com",
@@ -86,7 +86,7 @@ const firebaseConfig = {
     window.login = async () => {
       const inputName = document.getElementById('login-name').value.trim();
       const password = document.getElementById('login-password').value.trim();
-      if (!inputName || !password) return alert("請輸入姓名與密碼");
+      if (!inputName || !password) return alert("請輸入姓名與身分證末六碼");
 
       let targetEmail = "";
       if (inputName === "導師" || inputName === "老師") targetEmail = "teacher@class.local";
@@ -96,7 +96,7 @@ const firebaseConfig = {
         targetEmail = student.email;
       }
       try { await signInWithEmailAndPassword(auth, targetEmail, password); } 
-      catch (error) { alert("登入失敗：身分證末四碼不正確"); }
+      catch (error) { alert("登入失敗：身分證末六碼不正確，或該帳號尚未開通"); }
     };
 
     window.logout = () => signOut(auth);
@@ -127,7 +127,6 @@ const firebaseConfig = {
       reader.readAsArrayBuffer(file);
     };
 
-    // ★ 更新：新增事項時，紀錄建立者的 Email 與名稱
     window.createTask = async () => {
       const date = document.getElementById('task-date').value;
       const title = document.getElementById('task-title').value;
@@ -136,8 +135,8 @@ const firebaseConfig = {
         date, 
         title, 
         createdAt: new Date().toISOString(),
-        createdByEmail: currentUser.email,        // 記錄建立者信箱
-        createdByName: currentUserInfo.name       // 記錄建立者姓名
+        createdByEmail: currentUser.email,        
+        createdByName: currentUserInfo.name       
       });
       document.getElementById('task-title').value = '';
     };
@@ -183,17 +182,14 @@ const firebaseConfig = {
       const currentTaskRecords = {};
       allRecords.forEach(r => { if (r.taskId === currentTaskId) currentTaskRecords[r.seatNum] = r.status; });
 
-      // ★ 核心功能：判斷目前使用者是否有權限編輯這個項目
       const currentTask = allTasks.find(t => t.id === currentTaskId);
-      const isTeacher = currentUser.email === "teacher@class.local"; // 導師有無敵權限
-      const isCreator = currentTask && currentTask.createdByEmail === currentUser.email; // 是否為本人建立
-      const canEdit = isTeacher || isCreator; // 符合任一條件即可編輯
+      const isTeacher = currentUser.email === "teacher@class.local"; 
+      const isCreator = currentTask && currentTask.createdByEmail === currentUser.email; 
+      const canEdit = isTeacher || isCreator; 
 
       studentsList.forEach((student) => {
         const statusKey = currentTaskRecords[student.seatNum] || 'missing';
         const statusInfo = STATUS_MAP[statusKey];
-
-        // 根據權限改變游標與視覺效果 (無權限者看起來會稍微半透明)
         const cursorClass = canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60 grayscale-[30%]';
 
         const card = document.createElement('div');
@@ -204,7 +200,6 @@ const firebaseConfig = {
           if (canEdit) {
             toggleStatus(student.seatNum, statusKey);
           } else {
-            // 無權限時跳出警告
             const creatorName = currentTask.createdByName ? currentTask.createdByName : '其他人';
             alert(`⚠️ 權限不足！\n\n此項目是由【${creatorName}】建立的。\n只有建立者本人與導師可以修改繳交狀態。`);
           }
@@ -233,19 +228,28 @@ const firebaseConfig = {
       if (allTasks.length === 0) return container.innerHTML = '<div class="text-center text-gray-500 p-6">目前還沒有新增任何事項。</div>';
       container.innerHTML = '';
       let hasAnyUnfinished = false;
+      
       studentsList.forEach(student => {
         const uncompleted = [];
         allTasks.forEach(task => {
           const record = allRecords.find(r => r.taskId === task.id && r.seatNum === student.seatNum);
           const status = record ? record.status : 'missing';
-          if (status === 'missing') uncompleted.push(`<span class="text-red-600">❌ [${task.date}] ${task.title} (未交)</span>`);
-          else if (status === 'issue') uncompleted.push(`<span class="text-yellow-600">⚠️ [${task.date}] ${task.title} (缺漏)</span>`);
+          
+          // ★ 抓取該事項的建立者名稱 (若是以前建立的舊資料，預設顯示為"導師")
+          const creatorName = task.createdByName ? task.createdByName : '導師';
+
+          if (status === 'missing') {
+            uncompleted.push(`<li class="flex items-center justify-between"><span class="text-red-600">❌ [${task.date}] ${task.title} (未交)</span><span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">登記人: ${creatorName}</span></li>`);
+          } else if (status === 'issue') {
+            uncompleted.push(`<li class="flex items-center justify-between"><span class="text-yellow-600">⚠️ [${task.date}] ${task.title} (缺漏)</span><span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">登記人: ${creatorName}</span></li>`);
+          }
         });
+        
         if (uncompleted.length > 0) {
           hasAnyUnfinished = true;
           const card = document.createElement('div');
           card.className = "bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-3";
-          card.innerHTML = `<div class="font-bold text-lg mb-2 flex items-center border-b pb-2"><span class="bg-blue-100 text-blue-800 rounded-full w-8 h-8 flex items-center justify-center mr-2">${student.seatNum}</span>${student.name}</div><ul class="space-y-1 ml-2">${uncompleted.map(msg => `<li>${msg}</li>`).join('')}</ul>`;
+          card.innerHTML = `<div class="font-bold text-lg mb-2 flex items-center border-b pb-2"><span class="bg-blue-100 text-blue-800 rounded-full w-8 h-8 flex items-center justify-center mr-2">${student.seatNum}</span>${student.name}</div><ul class="space-y-2 ml-2">${uncompleted.join('')}</ul>`;
           container.appendChild(card);
         }
       });
@@ -256,10 +260,17 @@ const firebaseConfig = {
 <body class="bg-slate-50 min-h-screen text-slate-800">
   <div id="auth-section" class="max-w-md mx-auto mt-20 p-6 bg-white rounded-xl shadow-md">
     <h1 class="text-2xl font-bold mb-6 text-center text-blue-600">班級繳交系統登入</h1>
-    <div class="mb-4"><label class="block text-gray-700 font-bold mb-1">學生姓名 / 導師</label><input type="text" id="login-name" placeholder="請輸入姓名" class="w-full p-2 border rounded"></div>
-    <div class="mb-6"><label class="block text-gray-700 font-bold mb-1">身分證末四碼 (密碼)</label><input type="password" id="login-password" placeholder="請輸入密碼" class="w-full p-2 border rounded"></div>
+    <div class="mb-4">
+      <label class="block text-gray-700 font-bold mb-1">學生姓名 / 導師</label>
+      <input type="text" id="login-name" placeholder="請輸入姓名" class="w-full p-2 border rounded">
+    </div>
+    <div class="mb-6">
+      <label class="block text-gray-700 font-bold mb-1">身分證末六碼 (密碼)</label>
+      <input type="password" id="login-password" placeholder="請輸入身分證末六碼" class="w-full p-2 border rounded">
+    </div>
     <button onclick="login()" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-bold">登入系統</button>
   </div>
+  
   <div id="app-section" class="hidden max-w-4xl mx-auto p-4">
     <div class="flex flex-wrap justify-between items-center bg-white p-4 rounded-lg shadow mb-4">
       <div class="text-sm sm:text-base font-bold">目前使用者：<span id="user-name" class="font-normal text-blue-600"></span></div>
