@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>班級繳交登記系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 加入 SheetJS 解析 Excel 的工具 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 1. 請替換為您的 Firebase 專案配置 
+   const firebaseConfig = {
+  apiKey: "AIzaSy......................",
+  authDomain: "your-project-name.firebaseapp.com",
+  projectId: "your-project-name",
+  storageBucket: "your-project-name.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdefg"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let studentsList = []; // 將由資料庫載入
+    let currentUser = null;
+    let currentUserInfo = null;
+    let currentTaskId = null;
+    let allTasks = [];
+    let allRecords = [];
+
+    // 網頁一載入，先偷偷去抓名單 (為了讓登入介面可以比對姓名)
+    getDocs(collection(db, "students")).then(snapshot => {
+      studentsList = snapshot.docs.map(doc => doc.data());
+      studentsList.sort((a, b) => a.seatNum - b.seatNum);
+    });
+
+    const STATUS_MAP = {
+      'missing': { label: '❌ 未交', class: 'bg-red-100 text-red-700 border-red-300' },
+      'submitted': { label: '✅ 已交', class: 'bg-green-100 text-green-700 border-green-300' },
+      'issue': { label: '⚠️ 有缺漏', class: 'bg-yellow-100 text-yellow-700 border-yellow-400' }
+    };
+    const STATUS_NEXT = { 'missing': 'submitted', 'submitted': 'issue', 'issue': 'missing' };
+
+    const authSection = document.getElementById('auth-section');
+    const appSection = document.getElementById('app-section');
+    const userNameSpan = document.getElementById('user-name');
+    const teacherPanel = document.getElementById('teacher-panel');
+
+    document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
+
+    // 驗證狀態監聽
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUser = user;
+        
+        // 判斷是導師還是學生
+        if (user.email === "teacher@class.local") {
+          currentUserInfo = { name: "導師", seatNum: 0, role: 'teacher' };
+          userNameSpan.textContent = "導師";
+          teacherPanel.classList.remove('hidden'); // 顯示上傳區塊
+        } else {
+          // 透過信箱反查是哪位學生
+          const q = query(collection(db, "students"), where("email", "==", user.email));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const studentData = querySnapshot.docs[0].data();
+            currentUserInfo = { name: studentData.name, seatNum: studentData.seatNum, role: 'student' };
+            userNameSpan.textContent = `${studentData.seatNum}號 ${studentData.name}`;
+          }
+          teacherPanel.classList.add('hidden'); // 隱藏上傳區塊
+        }
+
+        authSection.classList.add('hidden');
+        appSection.classList.remove('hidden');
+        initDataListeners();
+      } else {
+        currentUser = null;
+        currentUserInfo = null;
+        authSection.classList.remove('hidden');
+        appSection.classList.add('hidden');
+      }
+    });
+
+    // 登入功能
+    window.login = async () => {
+      const inputName = document.getElementById('login-name').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+      if (!inputName || !password) return alert("請輸入姓名與密碼");
+
+      let targetEmail = "";
+      if (inputName === "導師" || inputName === "老師") {
+        targetEmail = "teacher@class.local";
+      } else {
+        const student = studentsList.find(s => s.name === inputName);
+        if (!student) return alert("資料庫中找不到該姓名，請確認導師是否已上傳名單，或姓名有無錯別字。");
+        targetEmail = student.email;
+      }
+
+      try {
+        await signInWithEmailAndPassword(auth, targetEmail, password);
+      } catch (error) {
+        alert("登入失敗：身分證末四碼不正確，或帳號尚未開通");
+      }
+    };
+
+    window.logout = () => signOut(auth);
+
+    // ================= 導師上傳 Excel 核心功能 =================
+    window.uploadExcel = () => {
+      const fileInput = document.getElementById('excel-file');
+      const file = fileInput.files[0];
+      if (!file) return alert("請先選擇 Excel 檔案！");
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, {type: 'array'});
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const excelData = XLSX.utils.sheet_to_json(firstSheet);
+
+          let count = 0;
+          for (let row of excelData) {
+            const seat = row['座號'];
+            const name = row['姓名'];
+            const email = row['虛擬信箱'];
+
+            if (seat && name && email) {
+              // 逐筆寫入 Firebase
+              await setDoc(doc(db, "students", seat.toString()), {
+                seatNum: parseInt(seat),
+                name: name.toString().trim(),
+                email: email.toString().trim()
+              });
+              count++;
+            }
+          }
+          alert(`✅ 成功匯入 ${count} 筆學生資料！\n資料已同步至資料庫，全班皆可看見最新名單。`);
+          fileInput.value = ""; // 清空上傳欄位
+        } catch (err) {
+          console.error(err);
+          alert("讀取 Excel 失敗，請確認檔案與第一列標題是否為：座號、姓名、虛擬信箱");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    };
+    // ========================================================
+
+    window.createTask = async () => {
+      const date = document.getElementById('task-date').value;
+      const title = document.getElementById('task-title').value;
+      if (!date || !title) return alert("請輸入日期與項目名稱");
+      await setDoc(doc(db, "tasks", 'task_' + Date.now()), { date, title, createdAt: new Date().toISOString() });
+      document.getElementById('task-title').value = '';
+    };
+
+    function initDataListeners() {
+      // 監聽學生名單 (隨時更新畫面)
+      onSnapshot(collection(db, "students"), (snapshot) => {
+        studentsList = snapshot.docs.map(doc => doc.data());
+        studentsList.sort((a, b) => a.seatNum - b.seatNum);
+        if (currentTaskId) renderGrid();
+        renderSummary();
+      });
+
+      onSnapshot(query(collection(db, "tasks"), orderBy("createdAt", "desc")), (snapshot) => {
+        allTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        allTasks.sort((a, b) => new Date(b.date) - new Date(a.date)); 
+        renderTaskSelect();
+        renderSummary();
+      });
+
+      onSnapshot(collection(db, "records"), (snapshot) => {
+        allRecords = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (currentTaskId) renderGrid();
+        renderSummary();
+      });
+    }
+
+    function renderTaskSelect() {
+      const select = document.getElementById('task-select');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">-- 請選擇要登記的項目 --</option>';
+      allTasks.forEach(task => {
+        const opt = document.createElement('option');
+        opt.value = task.id;
+        opt.textContent = `[${task.date}] ${task.title}`;
+        select.appendChild(opt);
+      });
+      if (allTasks.some(t => t.id === currentVal)) select.value = currentVal;
+    }
+
+    window.onTaskChange = () => { currentTaskId = document.getElementById('task-select').value; renderGrid(); };
+
+    function renderGrid() {
+      const grid = document.getElementById('student-grid');
+      if (!currentTaskId) return grid.innerHTML = '<div class="col-span-full text-center text-gray-500">請先在上方選擇一個項目</div>';
+      grid.innerHTML = '';
+
+      const currentTaskRecords = {};
+      allRecords.forEach(r => { if (r.taskId === currentTaskId) currentTaskRecords[r.seatNum] = r.status; });
+
+      studentsList.forEach((student) => {
+        const statusKey = currentTaskRecords[student.seatNum] || 'missing';
+        const statusInfo = STATUS_MAP[statusKey];
+
+        const card = document.createElement('div');
+        card.className = `p-3 border-2 rounded-lg cursor-pointer flex flex-col items-center justify-between transition-all ${statusInfo.class} hover:opacity-80`;
+        card.innerHTML = `
+          <div class="font-bold text-lg">${student.seatNum}</div>
+          <div class="text-sm my-1">${student.name}</div>
+          <div class="text-xs font-semibold px-2 py-1 rounded bg-white/50 text-center leading-tight h-8 flex items-center justify-center w-full">${statusInfo.label}</div>
+        `;
+        card.onclick = () => toggleStatus(student.seatNum, statusKey);
+        grid.appendChild(card);
+      });
+    }
+
+    async function toggleStatus(seatNum, currentStatus) {
+      if (!currentTaskId) return;
+      await setDoc(doc(db, "records", `${currentTaskId}_${seatNum}`), {
+        taskId: currentTaskId, seatNum: seatNum, status: STATUS_NEXT[currentStatus],
+        updatedBy: currentUserInfo ? currentUserInfo.name : currentUser.email, updatedAt: new Date().toISOString()
+      });
+    }
+
+    window.switchTab = (tabName) => {
+      document.getElementById('tab-register').className = `w-1/2 py-3 border-b-4 transition-colors ${tabName==='register' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`;
+      document.getElementById('tab-summary').className = `w-1/2 py-3 border-b-4 transition-colors ${tabName==='summary' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`;
+      document.getElementById('view-register').classList.toggle('hidden', tabName !== 'register');
+      document.getElementById('view-summary').classList.toggle('hidden', tabName !== 'summary');
+    };
+
+    function renderSummary() {
+      const container = document.getElementById('summary-list');
+      if (allTasks.length === 0) return container.innerHTML = '<div class="text-center text-gray-500 p-6">目前還沒有新增任何事項。</div>';
+      container.innerHTML = '';
+      
+      let hasAnyUnfinished = false;
+      studentsList.forEach(student => {
+        const uncompleted = [];
+        allTasks.forEach(task => {
+          const record = allRecords.find(r => r.taskId === task.id && r.seatNum === student.seatNum);
+          const status = record ? record.status : 'missing';
+          if (status === 'missing') uncompleted.push(`<span class="text-red-600">❌ [${task.date}] ${task.title} (未交)</span>`);
+          else if (status === 'issue') uncompleted.push(`<span class="text-yellow-600">⚠️ [${task.date}] ${task.title} (缺漏)</span>`);
+        });
+
+        if (uncompleted.length > 0) {
+          hasAnyUnfinished = true;
+          const card = document.createElement('div');
+          card.className = "bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-3";
+          card.innerHTML = `<div class="font-bold text-lg mb-2 flex items-center border-b pb-2"><span class="bg-blue-100 text-blue-800 rounded-full w-8 h-8 flex items-center justify-center mr-2">${student.seatNum}</span>${student.name}</div><ul class="space-y-1 ml-2">${uncompleted.map(msg => `<li>${msg}</li>`).join('')}</ul>`;
+          container.appendChild(card);
+        }
+      });
+      if (!hasAnyUnfinished) container.innerHTML = `<div class="text-center text-green-600 p-10 bg-green-50 rounded-lg border border-green-200">🎉 全班無缺交！</div>`;
+    }
+  </script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+  <div id="auth-section" class="max-w-md mx-auto mt-20 p-6 bg-white rounded-xl shadow-md">
+    <h1 class="text-2xl font-bold mb-6 text-center text-blue-600">班級繳交系統登入</h1>
+    <div class="mb-4">
+      <label class="block text-gray-700 font-bold mb-1">學生姓名 / 導師</label>
+      <input type="text" id="login-name" placeholder="請輸入姓名 (例如：王小明 或 導師)" class="w-full p-2 border rounded">
+    </div>
+    <div class="mb-6">
+      <label class="block text-gray-700 font-bold mb-1">身分證末四碼 (密碼)</label>
+      <input type="password" id="login-password" placeholder="請輸入密碼" class="w-full p-2 border rounded">
+    </div>
+    <button onclick="login()" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-bold">登入系統</button>
+  </div>
+
+  <div id="app-section" class="hidden max-w-4xl mx-auto p-4">
+    <div class="flex flex-wrap justify-between items-center bg-white p-4 rounded-lg shadow mb-4">
+      <div class="text-sm sm:text-base font-bold">目前使用者：<span id="user-name" class="font-normal text-blue-600"></span></div>
+      <button onclick="logout()" class="text-sm bg-gray-200 px-3 py-1 mt-2 sm:mt-0 rounded hover:bg-gray-300">登出</button>
+    </div>
+
+    <!-- 導師專用：上傳 Excel 區塊 -->
+    <div id="teacher-panel" class="hidden bg-yellow-50 p-4 rounded-lg shadow mb-6 border border-yellow-300">
+      <h2 class="font-bold text-yellow-800 mb-2">📁 導師專用：匯入 Excel 學生名單</h2>
+      <p class="text-sm text-yellow-700 mb-3">請確保 Excel 第一列的標題為：<strong>座號、姓名、虛擬信箱</strong></p>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input type="file" id="excel-file" accept=".xlsx, .xls" class="flex-1 p-1 border bg-white rounded">
+        <button onclick="uploadExcel()" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 font-bold">上傳名單至資料庫</button>
+      </div>
+    </div>
+
+    <div class="flex border-b border-gray-300 mb-6 font-bold text-lg">
+      <button id="tab-register" onclick="switchTab('register')" class="w-1/2 py-3 border-b-4 border-blue-600 text-blue-600 transition-colors">📝 日常登記模式</button>
+      <button id="tab-summary" onclick="switchTab('summary')" class="w-1/2 py-3 border-b-4 border-transparent text-gray-500 hover:text-blue-500 transition-colors">📊 缺交總表</button>
+    </div>
+
+    <div id="view-register">
+      <div class="bg-white p-4 rounded-lg shadow mb-6 space-y-4">
+        <h2 class="font-bold text-gray-700">🆕 新增繳交項目</h2>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input type="date" id="task-date" class="p-2 border rounded">
+          <input type="text" id="task-title" placeholder="項目名稱 (如：聯絡簿)" class="flex-1 p-2 border rounded">
+          <button onclick="createTask()" class="bg-green-600 text-white px-4 py-2 rounded">新增事項</button>
+        </div>
+        <hr class="my-2 border-gray-200">
+        <h2 class="font-bold text-gray-700">🎯 選擇登記項目</h2>
+        <select id="task-select" onchange="onTaskChange()" class="w-full p-2 border border-blue-300 rounded bg-blue-50">
+          <option value="">-- 請選擇要登記的項目 --</option>
+        </select>
+      </div>
+      <div id="student-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+        <div class="col-span-full text-center text-gray-500">請先在上方選擇一個項目</div>
+      </div>
+    </div>
+
+    <div id="view-summary" class="hidden">
+      <div class="bg-white p-4 rounded-lg shadow mb-4">
+        <h2 class="text-xl font-bold text-gray-800 mb-2">📋 學生未完成清單</h2>
+        <div id="summary-list" class="space-y-4"></div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
