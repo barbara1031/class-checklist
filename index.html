@@ -4,18 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>班級繳交登記系統</title>
+  
+  <!-- ★ 網頁分頁的小圖標 (Favicon) 改為作業圖示 📝 -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📝</text></svg>">
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    // 引入了 setPersistence 與 browserSessionPersistence 來達成「關閉網頁自動登出」
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    // ★ 新增了 deleteDoc 功能
+    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 1. 請替換為您的 Firebase 專屬金鑰
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+   // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyBWyQkQ3maeT1fLTXzeENC00TdOWEfZ0MM",
   authDomain: "class-checklist-acbb3.firebaseapp.com",
@@ -97,7 +101,6 @@ const firebaseConfig = {
         targetEmail = student.email;
       }
       try { 
-        // ★ 設定：關閉網頁/分頁就會自動登出 (Session 模式)
         await setPersistence(auth, browserSessionPersistence);
         await signInWithEmailAndPassword(auth, targetEmail, password); 
       } 
@@ -146,6 +149,35 @@ const firebaseConfig = {
       document.getElementById('task-title').value = '';
     };
 
+    // ★ 刪除功能核心邏輯
+    window.deleteTask = async () => {
+      if (!currentTaskId) return;
+      const currentTask = allTasks.find(t => t.id === currentTaskId);
+      if (!currentTask) return;
+
+      const confirmDelete = confirm(`⚠️ 確定要刪除「${currentTask.title}」嗎？\n刪除後，全班的繳交紀錄都會一併消失，且無法復原喔！`);
+      if (!confirmDelete) return;
+
+      try {
+        // 1. 刪除該事項底下的所有繳交紀錄
+        const recordsToDelete = allRecords.filter(r => r.taskId === currentTaskId);
+        for (let r of recordsToDelete) {
+          await deleteDoc(doc(db, "records", r.id));
+        }
+        // 2. 刪除該事項本身
+        await deleteDoc(doc(db, "tasks", currentTaskId));
+
+        alert("✅ 項目已成功刪除！");
+        document.getElementById('task-select').value = "";
+        currentTaskId = null;
+        document.getElementById('btn-delete-task').classList.add('hidden');
+        renderGrid();
+      } catch (error) {
+        console.error(error);
+        alert("刪除失敗，請確認您的網路連線。");
+      }
+    };
+
     function initDataListeners() {
       onSnapshot(collection(db, "students"), (snapshot) => {
         studentsList = snapshot.docs.map(doc => doc.data()).sort((a, b) => a.seatNum - b.seatNum);
@@ -171,7 +203,6 @@ const firebaseConfig = {
       allTasks.forEach(task => {
         const opt = document.createElement('option');
         opt.value = task.id;
-        // ★ 在下拉選單中加入顯示「登記人」
         const creatorName = task.createdByName ? task.createdByName : '導師';
         opt.textContent = `[${task.date}] ${task.title} (登記人：${creatorName})`;
         select.appendChild(opt);
@@ -179,7 +210,27 @@ const firebaseConfig = {
       if (allTasks.some(t => t.id === currentVal)) select.value = currentVal;
     }
 
-    window.onTaskChange = () => { currentTaskId = document.getElementById('task-select').value; renderGrid(); };
+    window.onTaskChange = () => { 
+      currentTaskId = document.getElementById('task-select').value; 
+      
+      // ★ 判斷是否顯示「刪除按鈕」
+      const currentTask = allTasks.find(t => t.id === currentTaskId);
+      const btnDelete = document.getElementById('btn-delete-task');
+      
+      if (currentTask) {
+        const isTeacher = currentUser.email === "teacher@class.local"; 
+        const isCreator = currentTask.createdByEmail === currentUser.email; 
+        if (isTeacher || isCreator) {
+          btnDelete.classList.remove('hidden'); // 顯示刪除按鈕
+        } else {
+          btnDelete.classList.add('hidden'); // 隱藏刪除按鈕
+        }
+      } else {
+        btnDelete.classList.add('hidden');
+      }
+
+      renderGrid(); 
+    };
 
     function renderGrid() {
       const grid = document.getElementById('student-grid');
@@ -286,7 +337,6 @@ const firebaseConfig = {
       <div class="flex flex-col sm:flex-row gap-2"><input type="file" id="excel-file" accept=".xlsx, .xls" class="flex-1 p-1 border bg-white rounded"><button onclick="uploadExcel()" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 font-bold">上傳名單至資料庫</button></div>
     </div>
     
-    <!-- ★ 分頁圖示已改為作業與書本圖示 -->
     <div class="flex border-b border-gray-300 mb-6 font-bold text-lg">
       <button id="tab-register" onclick="switchTab('register')" class="w-1/2 py-3 border-b-4 border-blue-600 text-blue-600 transition-colors flex items-center justify-center gap-2">✏️ 作業登記模式</button>
       <button id="tab-summary" onclick="switchTab('summary')" class="w-1/2 py-3 border-b-4 border-transparent text-gray-500 hover:text-blue-500 transition-colors flex items-center justify-center gap-2">📚 缺交作業總表</button>
@@ -294,9 +344,15 @@ const firebaseConfig = {
     
     <div id="view-register">
       <div class="bg-white p-4 rounded-lg shadow mb-6 space-y-4">
-        <div class="flex flex-col sm:flex-row gap-2"><input type="date" id="task-date" class="p-2 border rounded"><input type="text" id="task-title" placeholder="項目名稱 (如：聯絡簿、數習)" class="flex-1 p-2 border rounded"><button onclick="createTask()" class="bg-green-600 text-white px-4 py-2 rounded">新增事項</button></div>
+        <div class="flex flex-col sm:flex-row gap-2"><input type="date" id="task-date" class="p-2 border rounded"><input type="text" id="task-title" placeholder="項目名稱 (如：聯絡簿、數習)" class="flex-1 p-2 border rounded"><button onclick="createTask()" class="bg-green-600 text-white px-4 py-2 rounded whitespace-nowrap">新增事項</button></div>
         <hr class="my-2 border-gray-200">
-        <select id="task-select" onchange="onTaskChange()" class="w-full p-2 border border-blue-300 rounded bg-blue-50"><option value="">-- 請選擇要登記的項目 --</option></select>
+        <!-- ★ 新增的刪除按鈕區塊 -->
+        <div class="flex items-center gap-2">
+          <select id="task-select" onchange="onTaskChange()" class="flex-1 p-2 border border-blue-300 rounded bg-blue-50">
+            <option value="">-- 請選擇要登記的項目 --</option>
+          </select>
+          <button id="btn-delete-task" onclick="deleteTask()" class="hidden bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 font-bold whitespace-nowrap transition-colors shadow">🗑️ 刪除</button>
+        </div>
       </div>
       <div id="student-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
         <div class="col-span-full text-center text-gray-500">請先在上方選擇一個項目</div>
