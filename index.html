@@ -10,11 +10,12 @@
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    // 引入了 setPersistence 與 browserSessionPersistence 來達成「關閉網頁自動登出」
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 1. 請替換為您的 Firebase 專屬金鑰
- // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyBWyQkQ3maeT1fLTXzeENC00TdOWEfZ0MM",
   authDomain: "class-checklist-acbb3.firebaseapp.com",
@@ -95,7 +96,11 @@ const firebaseConfig = {
         if (!student) return alert("找不到該姓名，請確認導師已上傳名單，或無錯別字。");
         targetEmail = student.email;
       }
-      try { await signInWithEmailAndPassword(auth, targetEmail, password); } 
+      try { 
+        // ★ 設定：關閉網頁/分頁就會自動登出 (Session 模式)
+        await setPersistence(auth, browserSessionPersistence);
+        await signInWithEmailAndPassword(auth, targetEmail, password); 
+      } 
       catch (error) { alert("登入失敗：身分證末六碼不正確，或該帳號尚未開通"); }
     };
 
@@ -166,7 +171,9 @@ const firebaseConfig = {
       allTasks.forEach(task => {
         const opt = document.createElement('option');
         opt.value = task.id;
-        opt.textContent = `[${task.date}] ${task.title}`;
+        // ★ 在下拉選單中加入顯示「登記人」
+        const creatorName = task.createdByName ? task.createdByName : '導師';
+        opt.textContent = `[${task.date}] ${task.title} (登記人：${creatorName})`;
         select.appendChild(opt);
       });
       if (allTasks.some(t => t.id === currentVal)) select.value = currentVal;
@@ -217,8 +224,8 @@ const firebaseConfig = {
     }
 
     window.switchTab = (tabName) => {
-      document.getElementById('tab-register').className = `w-1/2 py-3 border-b-4 transition-colors ${tabName==='register' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`;
-      document.getElementById('tab-summary').className = `w-1/2 py-3 border-b-4 transition-colors ${tabName==='summary' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`;
+      document.getElementById('tab-register').className = `w-1/2 py-3 border-b-4 transition-colors flex items-center justify-center gap-2 ${tabName==='register' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`;
+      document.getElementById('tab-summary').className = `w-1/2 py-3 border-b-4 transition-colors flex items-center justify-center gap-2 ${tabName==='summary' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`;
       document.getElementById('view-register').classList.toggle('hidden', tabName !== 'register');
       document.getElementById('view-summary').classList.toggle('hidden', tabName !== 'summary');
     };
@@ -234,8 +241,6 @@ const firebaseConfig = {
         allTasks.forEach(task => {
           const record = allRecords.find(r => r.taskId === task.id && r.seatNum === student.seatNum);
           const status = record ? record.status : 'missing';
-          
-          // ★ 抓取該事項的建立者名稱 (若是以前建立的舊資料，預設顯示為"導師")
           const creatorName = task.createdByName ? task.createdByName : '導師';
 
           if (status === 'missing') {
@@ -280,13 +285,16 @@ const firebaseConfig = {
       <h2 class="font-bold text-yellow-800 mb-2">📁 導師專用：匯入 Excel 學生名單</h2>
       <div class="flex flex-col sm:flex-row gap-2"><input type="file" id="excel-file" accept=".xlsx, .xls" class="flex-1 p-1 border bg-white rounded"><button onclick="uploadExcel()" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 font-bold">上傳名單至資料庫</button></div>
     </div>
+    
+    <!-- ★ 分頁圖示已改為作業與書本圖示 -->
     <div class="flex border-b border-gray-300 mb-6 font-bold text-lg">
-      <button id="tab-register" onclick="switchTab('register')" class="w-1/2 py-3 border-b-4 border-blue-600 text-blue-600 transition-colors">📝 日常登記模式</button>
-      <button id="tab-summary" onclick="switchTab('summary')" class="w-1/2 py-3 border-b-4 border-transparent text-gray-500 hover:text-blue-500 transition-colors">📊 缺交總表</button>
+      <button id="tab-register" onclick="switchTab('register')" class="w-1/2 py-3 border-b-4 border-blue-600 text-blue-600 transition-colors flex items-center justify-center gap-2">✏️ 作業登記模式</button>
+      <button id="tab-summary" onclick="switchTab('summary')" class="w-1/2 py-3 border-b-4 border-transparent text-gray-500 hover:text-blue-500 transition-colors flex items-center justify-center gap-2">📚 缺交作業總表</button>
     </div>
+    
     <div id="view-register">
       <div class="bg-white p-4 rounded-lg shadow mb-6 space-y-4">
-        <div class="flex flex-col sm:flex-row gap-2"><input type="date" id="task-date" class="p-2 border rounded"><input type="text" id="task-title" placeholder="項目名稱 (如：聯絡簿)" class="flex-1 p-2 border rounded"><button onclick="createTask()" class="bg-green-600 text-white px-4 py-2 rounded">新增事項</button></div>
+        <div class="flex flex-col sm:flex-row gap-2"><input type="date" id="task-date" class="p-2 border rounded"><input type="text" id="task-title" placeholder="項目名稱 (如：聯絡簿、數習)" class="flex-1 p-2 border rounded"><button onclick="createTask()" class="bg-green-600 text-white px-4 py-2 rounded">新增事項</button></div>
         <hr class="my-2 border-gray-200">
         <select id="task-select" onchange="onTaskChange()" class="w-full p-2 border border-blue-300 rounded bg-blue-50"><option value="">-- 請選擇要登記的項目 --</option></select>
       </div>
@@ -294,6 +302,7 @@ const firebaseConfig = {
         <div class="col-span-full text-center text-gray-500">請先在上方選擇一個項目</div>
       </div>
     </div>
+    
     <div id="view-summary" class="hidden">
       <div class="bg-white p-4 rounded-lg shadow mb-4"><h2 class="text-xl font-bold text-gray-800 mb-2">📋 學生未完成清單</h2><div id="summary-list" class="space-y-4"></div></div>
     </div>
