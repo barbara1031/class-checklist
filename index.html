@@ -13,19 +13,14 @@
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
         
-        /* 響應式容器 */
         .container { max-width: 1050px; margin: 0 auto; }
-        
-        /* 卡片通用樣式 */
         .card { background: white; padding: 22px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #f1f5f9; }
         .page-title { text-align: center; color: #2563eb; font-size: 22px; font-weight: bold; margin-bottom: 20px; }
 
-        /* 班級按鈕網格 */
         .class-grid { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
         .class-btn { padding: 15px 28px; font-size: 18px; background: #eff6ff; color: #2563eb; border: 2px solid #2563eb; border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .class-btn:hover { background: #2563eb; color: white; }
 
-        /* 表單與按鈕 */
         .form-group { margin-bottom: 18px; }
         .form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #334155; font-size: 15px; }
         .form-group select, .form-group input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; outline: none; background: white; }
@@ -38,18 +33,15 @@
         .btn-secondary { width: 100%; padding: 10px; background: #e2e8f0; color: #475569; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-upload { background: #d97706; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; }
 
-        /* 頂部導航資訊欄 */
         .user-header { display: flex; justify-content: space-between; align-items: center; }
         .user-info { font-size: 16px; font-weight: bold; }
         .btn-logout { padding: 6px 14px; background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
 
-        /* 頁籤切換列 */
         .tab-bar { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; }
         .tab-item { flex: 1; text-align: center; padding: 14px; font-weight: bold; color: #64748b; cursor: pointer; font-size: 16px; position: relative; }
         .tab-item.active { color: #2563eb; }
         .tab-item.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: #2563eb; border-radius: 3px 3px 0 0; }
 
-        /* 缺交作業總表卡片與網格 */
         .section-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
         .student-item-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between; }
         .student-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 18px; font-weight: bold; }
@@ -60,12 +52,10 @@
         .missing-info { display: flex; align-items: center; gap: 6px; font-weight: 500; }
         .registrar-tag { font-size: 12px; color: #94a3b8; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #f1f5f9; flex-shrink: 0; }
 
-        /* 作業項目列表樣式 */
         .hw-bar-item { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid #2563eb; padding: 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .hw-info-title { font-weight: bold; font-size: 16px; color: #1e293b; }
         .hw-info-sub { font-size: 13px; color: #64748b; margin-top: 3px; }
 
-        /* 學生點擊網格與 4 種狀態樣式 */
         .clickable-student { padding: 14px 10px; border-radius: 10px; border: 2px solid #cbd5e1; text-align: center; cursor: pointer; user-select: none; transition: transform 0.1s; }
         .clickable-student:active { transform: scale(0.96); }
         .status-not_submitted { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
@@ -73,11 +63,9 @@
         .status-incomplete { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
         .status-leave { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
 
-        /* Modal 視窗 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: white; padding: 25px; border-radius: 16px; width: 90%; max-width: 480px; }
 
-        /* 💻 電腦版適應媒體查詢 */
         @media (min-width: 768px) {
             body { padding: 30px; }
             .login-card-layout { max-width: 480px; margin: 0 auto; }
@@ -85,7 +73,6 @@
             .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
         }
 
-        /* 📱 手機版適應媒體查詢 */
         @media (max-width: 767px) {
             body { padding: 10px; }
             .missing-grid { display: flex; flex-direction: column; gap: 12px; }
@@ -102,7 +89,7 @@
         <div class="page-title">🏫 步驟 1：請選擇班級</div>
         
         <div id="classButtonsContainer" class="class-grid">
-            <span style="color:#888;">正在載入班級資料...</span>
+            <span style="color:#888;">正在讀取資料庫班級...</span>
         </div>
 
         <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;">
@@ -212,17 +199,16 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, getDoc, doc, setDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 🔴 請替換為您的 Firebase 設定 🔴
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyBWyQkQ3maeT1fLTXzeENC00TdOWEfZ0MM",
-  authDomain: "class-checklist-acbb3.firebaseapp.com",
-  projectId: "class-checklist-acbb3",
-  storageBucket: "class-checklist-acbb3.firebasestorage.app",
-  messagingSenderId: "50418563088",
-  appId: "1:50418563088:web:3fc34a005910bee4d5b295",
-  measurementId: "G-JEPYMZVRN1"
-};
+    // 🟢 已帶入截圖 2 中真正的 Firebase 金鑰
+    const firebaseConfig = {
+        apiKey: "AIzaSyBwyQkQ3mae11fLTXzeENC0dTDOwEfZ0MM",
+        authDomain: "class-checklist-acbb3.firebaseapp.com",
+        projectId: "class-checklist-acbb3",
+        storageBucket: "class-checklist-acbb3.firebasestorage.app",
+        messagingSenderId: "50418563088",
+        appId: "1:50418563088:web:3fc34a005910bee4d5b295",
+        measurementId: "G-JEPYNZVRN1"
+    };
 
     const MENTOR_PIN = "8888"; // 導師預設密碼
 
@@ -236,7 +222,7 @@ const firebaseConfig = {
     let currentHwCreatedBy = "";
     let currentStudents = [];
     let studentStates = {};
-    let hwCreatedByMap = {}; // 快取紀錄每個作業的建立者
+    let hwCreatedByMap = {};
 
     function formatPassword(rawPwd) {
         if (!rawPwd) return "";
@@ -252,30 +238,47 @@ const firebaseConfig = {
         await loadClassButtons();
     });
 
+    // 載入班級按鈕 (加強版：相容舊有資料未寫入 class 欄位的情況)
     async function loadClassButtons() {
         const container = document.getElementById('classButtonsContainer');
-        const snap = await getDocs(collection(db, "students"));
-        
-        const classSet = new Set();
-        snap.forEach(docSnap => {
-            if (docSnap.data().class) classSet.add(docSnap.data().class);
-        });
+        try {
+            const snap = await getDocs(collection(db, "students"));
+            
+            const classSet = new Set();
+            let hasLegacyDataWithoutClass = false;
 
-        const classes = Array.from(classSet).sort();
-        container.innerHTML = '';
+            snap.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.class) {
+                    classSet.add(data.class);
+                } else if (data.name) {
+                    hasLegacyDataWithoutClass = true;
+                }
+            });
 
-        if (classes.length === 0) {
-            container.innerHTML = '<span style="color:#888;">尚未匯入班級，請點擊下方按鈕上傳名單。</span>';
-            return;
+            if (hasLegacyDataWithoutClass) {
+                classSet.add("預設班級");
+            }
+
+            const classes = Array.from(classSet).sort();
+            container.innerHTML = '';
+
+            if (classes.length === 0) {
+                container.innerHTML = '<span style="color:#888;">尚未匯入班級，請點擊下方按鈕上傳名單。</span>';
+                return;
+            }
+
+            classes.forEach(className => {
+                const btn = document.createElement('button');
+                btn.className = 'class-btn';
+                btn.innerText = `${className} 班`;
+                btn.onclick = () => selectClassAndGoToPage2(className);
+                container.appendChild(btn);
+            });
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<span style="color:red;">讀取資料失敗，請檢查 Firebase 資料庫權限設定！</span>';
         }
-
-        classes.forEach(className => {
-            const btn = document.createElement('button');
-            btn.className = 'class-btn';
-            btn.innerText = `${className} 班`;
-            btn.onclick = () => selectClassAndGoToPage2(className);
-            container.appendChild(btn);
-        });
     }
 
     const importModal = document.getElementById('importModal');
@@ -303,13 +306,13 @@ const firebaseConfig = {
                 let count = 0;
 
                 json.forEach(row => {
-                    const className = String(row["班級"] || "").trim();
+                    const className = String(row["班級"] || "").trim() || "預設班級";
                     const seat = String(row["座號"] || "").trim();
                     const name = String(row["姓名"] || "").trim();
                     const rawPwd = row["密碼"] || row["身分證末六碼"] || row["身分證號碼"] || "";
                     const pwd = formatPassword(rawPwd);
 
-                    if (className && seat && name && pwd) {
+                    if (seat && name && pwd) {
                         const docId = `${className}_${seat.padStart(2, '0')}`;
                         batch.set(doc(db, "students", docId), { 
                             class: className,
@@ -345,8 +348,14 @@ const firebaseConfig = {
         const userSelect = document.getElementById('userSelect');
         userSelect.innerHTML = '<option value="mentor">🧑‍🏫 導師</option>';
 
-        const q = query(collection(db, "students"), where("class", "==", currentClass));
-        const snap = await getDocs(q);
+        let snap;
+        if (className === "預設班級") {
+            snap = await getDocs(collection(db, "students"));
+        } else {
+            const q = query(collection(db, "students"), where("class", "==", currentClass));
+            snap = await getDocs(q);
+        }
+
         currentStudents = [];
         snap.forEach(docSnap => currentStudents.push(docSnap.data()));
         currentStudents.sort((a, b) => a.seat - b.seat);
@@ -450,7 +459,6 @@ const firebaseConfig = {
         window.selectHw(hwName, creator);
     };
 
-    // 4. 修改作業名稱功能 (更名時連動更新 records)
     window.renameHw = async (oldHwName) => {
         const creator = hwCreatedByMap[oldHwName] || '導師';
         const canManage = isMentor || creator === currentUser;
@@ -466,7 +474,6 @@ const firebaseConfig = {
         const trimmedNewName = newHwName.trim();
         const batch = writeBatch(db);
 
-        // A. 複製舊作業檔資料，建立新作業檔，刪除舊作業檔
         const oldHwRef = doc(db, "assignments", `${currentClass}_${oldHwName}`);
         const oldHwSnap = await getDoc(oldHwRef);
         const oldData = oldHwSnap.exists() ? oldHwSnap.data() : { class: currentClass, createdBy: creator, dateStr: new Date().toISOString().split('T')[0] };
@@ -478,8 +485,13 @@ const firebaseConfig = {
         });
         batch.delete(oldHwRef);
 
-        // B. 批次更新所有相關角色的繳交紀錄
-        const q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", oldHwName));
+        let q;
+        if (currentClass === "預設班級") {
+            q = query(collection(db, "records"), where("hwName", "==", oldHwName));
+        } else {
+            q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", oldHwName));
+        }
+        
         const recSnap = await getDocs(q);
         recSnap.forEach(d => {
             const recData = d.data();
@@ -503,10 +515,15 @@ const firebaseConfig = {
         loadSummaryList();
     };
 
-    // 載入作業列表 (新增「✏️ 改名」按鈕)
     async function loadHomeworkBars() {
         const container = document.getElementById('hwBarsContainer');
-        const q = query(collection(db, "assignments"), where("class", "==", currentClass));
+        let q;
+        if (currentClass === "預設班級") {
+            q = query(collection(db, "assignments"));
+        } else {
+            q = query(collection(db, "assignments"), where("class", "==", currentClass));
+        }
+
         const snap = await getDocs(q);
         container.innerHTML = '';
         hwCreatedByMap = {};
@@ -551,7 +568,6 @@ const firebaseConfig = {
         });
     }
 
-    // 新增作業條
     document.getElementById('addHwBtn').onclick = async () => {
         const hwName = document.getElementById('newHwInput').value.trim();
         if (!hwName) return alert("請輸入作業名稱！");
@@ -572,7 +588,6 @@ const firebaseConfig = {
         window.selectHw(hwName, currentUser);
     };
 
-    // 刪除作業
     window.deleteHw = async (hwName) => {
         const creator = hwCreatedByMap[hwName] || '導師';
         const canManage = isMentor || creator === currentUser;
@@ -587,7 +602,13 @@ const firebaseConfig = {
         const batch = writeBatch(db);
         batch.delete(doc(db, "assignments", `${currentClass}_${hwName}`));
 
-        const q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", hwName));
+        let q;
+        if (currentClass === "預設班級") {
+            q = query(collection(db, "records"), where("hwName", "==", hwName));
+        } else {
+            q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", hwName));
+        }
+
         const recSnap = await getDocs(q);
         recSnap.forEach(d => batch.delete(d.ref));
 
@@ -621,7 +642,13 @@ const firebaseConfig = {
 
         document.getElementById('deleteHwInMarkingBtn').style.display = 'inline-block';
 
-        const q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", hwName));
+        let q;
+        if (currentClass === "預設班級") {
+            q = query(collection(db, "records"), where("hwName", "==", hwName));
+        } else {
+            q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", hwName));
+        }
+
         const snap = await getDocs(q);
         studentStates = {};
         snap.forEach(d => studentStates[d.data().seat] = d.data().status);
@@ -629,7 +656,6 @@ const firebaseConfig = {
         renderStudentGrid();
     };
 
-    // 1. 學生卡片 4 種狀態循環切換 (未交 ➔ 已交 ➔ 缺漏 ➔ 請假)
     function renderStudentGrid() {
         const grid = document.getElementById('studentGrid');
         grid.innerHTML = '';
@@ -702,12 +728,17 @@ const firebaseConfig = {
         loadHomeworkBars();
     };
 
-    // 2. & 3. 缺交總表依「欠繳數量」由多到少排序，且「請假」不計入缺交數量
     async function loadSummaryList() {
         const container = document.getElementById('studentMissingContainer');
         container.innerHTML = '<div style="color:#94a3b8; text-align:center; grid-column:1/-1;">資料載入中...</div>';
 
-        const q = query(collection(db, "records"), where("class", "==", currentClass));
+        let q;
+        if (currentClass === "預設班級") {
+            q = query(collection(db, "records"));
+        } else {
+            q = query(collection(db, "records"), where("class", "==", currentClass));
+        }
+
         const snap = await getDocs(q);
 
         let map = {};
@@ -715,10 +746,8 @@ const firebaseConfig = {
 
         snap.forEach(d => {
             const r = d.data();
-            // 已交 (submitted) 不呈現
             if (r.status !== 'submitted' && map[r.seat]) {
                 map[r.seat].items.push(r);
-                // 只有「未交」與「有缺漏」算入欠繳數量 (請假不計入)
                 if (r.status === 'not_submitted' || r.status === 'incomplete') {
                     map[r.seat].missingCount++;
                 }
@@ -727,10 +756,8 @@ const firebaseConfig = {
 
         container.innerHTML = '';
 
-        // 轉換為陣列，並篩選出有作業未完成者 (missingCount > 0)
         let studentList = Object.values(map).filter(s => s.missingCount > 0);
 
-        // 2. 排序：缺交數量由多排到少 (missingCount 降序)；若數量相同，依座號升序
         studentList.sort((a, b) => {
             if (b.missingCount !== a.missingCount) {
                 return b.missingCount - a.missingCount;
