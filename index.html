@@ -42,22 +42,19 @@
         .tab-item.active { color: #2563eb; }
         .tab-item.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: #2563eb; border-radius: 3px 3px 0 0; }
 
-        /* 1. 缺交作業總表卡片與高對比顏色區隔 */
+        /* 缺交作業總表卡片 */
         .section-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
         .student-item-card { background: white; border-radius: 12px; border: 1px solid #cbd5e1; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; }
-        .student-header { background: #f1f5f9; padding: 12px 16px; border-bottom: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: space-between; font-size: 18px; font-weight: bold; }
+        
+        .student-header { background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: space-between; font-size: 18px; font-weight: bold; }
         .seat-badge { width: 30px; height: 30px; background: #2563eb; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
         
-        .missing-list { list-style: none; padding: 12px; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-        .missing-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: transform 0.1s, filter 0.15s; font-weight: 500; }
-        .missing-item:hover { filter: brightness(0.95); transform: translateY(-1px); }
-        
-        /* 明確的缺交項目色彩分級 */
-        .missing-item-not_submitted { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
-        .missing-item-incomplete { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
-        .missing-item-leave { background: #dbeafe; border: 1px solid #93c5fd; color: #1e40af; }
-
-        .registrar-tag { font-size: 12px; opacity: 0.85; background: rgba(255,255,255,0.7); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
+        .missing-list { list-style: none; padding: 0; margin: 0; }
+        .missing-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 14px; cursor: pointer; transition: background 0.15s; font-weight: 500; }
+        .missing-item:last-child { border-bottom: none; }
+        .missing-item:hover { background: #f1f5f9; }
+        .missing-info { display: flex; align-items: center; gap: 8px; }
+        .registrar-tag { font-size: 12px; color: #94a3b8; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; flex-shrink: 0; }
 
         .hw-bar-item { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid #2563eb; padding: 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .hw-info-title { font-weight: bold; font-size: 16px; color: #1e293b; }
@@ -148,7 +145,7 @@
         <!-- 作業登記模式 -->
         <div id="page3Content" style="display: none;">
             
-            <!-- 3. 學生登記勾選區 (改置於最上方，方便開啟後直接登記) -->
+            <!-- 學生登記勾選區 -->
             <div id="markingArea" class="card" style="display: none; border: 2px solid #2563eb;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
                     <div style="font-weight:bold; font-size:18px; color:#1e293b;">✍️ 登記作業：<span id="currentHwTitle" style="color:#2563eb;"></span></div>
@@ -162,7 +159,7 @@
                 <div class="student-grid" id="studentGrid"></div>
             </div>
 
-            <!-- 作業項目管理 (放置於下方) -->
+            <!-- 作業項目管理 -->
             <div class="card">
                 <div class="section-title">📂 作業項目管理</div>
                 <div style="display: flex; gap: 8px; margin-bottom: 15px;">
@@ -286,7 +283,7 @@ const firebaseConfig = {
             });
         } catch (e) {
             console.error(e);
-            container.innerHTML = '<span style="color:red;">讀取資料失敗，請檢查 Firebase 資料庫權限設定！</span>';
+            container.innerHTML = '<span style="color:red;">讀取資料庫失敗，請確認已發布正確的 Rules 權限設定！</span>';
         }
     }
 
@@ -524,7 +521,7 @@ const firebaseConfig = {
         loadSummaryList();
     };
 
-    // 2. 「改名」按鈕已修改為「編輯」 (移除鉛筆圖示)
+    // 載入作業列表：由舊到新排序 (舊的在上，新的在下)
     async function loadHomeworkBars() {
         const container = document.getElementById('hwBarsContainer');
         let q;
@@ -543,11 +540,20 @@ const firebaseConfig = {
             return;
         }
 
-        snap.forEach(d => {
-            const data = d.data();
+        let hwList = [];
+        snap.forEach(d => hwList.push({ id: d.id, ...d.data() }));
+
+        // 依時間/日期由舊到新排序 (舊 ➔ 新)
+        hwList.sort((a, b) => {
+            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.dateStr || '1970-01-01').getTime();
+            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.dateStr || '1970-01-01').getTime();
+            return timeA - timeB;
+        });
+
+        hwList.forEach(data => {
             const hwName = data.hwName;
             const createdBy = data.createdBy || '導師';
-            const dateStr = data.dateStr || '2026-09-05';
+            const dateStr = data.dateStr || '2026-09-25';
 
             hwCreatedByMap[hwName] = createdBy;
 
@@ -634,7 +640,6 @@ const firebaseConfig = {
         if (currentHw) window.deleteHw(currentHw);
     };
 
-    // 3. 點選作業後自動置頂滾動至最上方的登記卡片
     window.selectHw = async (hwName, createdBy) => {
         const creator = createdBy || hwCreatedByMap[hwName] || '導師';
         const canManage = isMentor || creator === currentUser;
@@ -649,10 +654,9 @@ const firebaseConfig = {
         currentHwCreatedBy = creator;
         
         document.getElementById('currentHwTitle').innerText = hwName;
+        
         const markingArea = document.getElementById('markingArea');
         markingArea.style.display = 'block';
-
-        // 自動平滑滾動到最頂部的登記區
         markingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         document.getElementById('deleteHwInMarkingBtn').style.display = 'inline-block';
@@ -743,7 +747,6 @@ const firebaseConfig = {
         loadHomeworkBars();
     };
 
-    // 1. 缺交作業總表高對比渲染 (學生名單頁首與彩色缺交項目)
     async function loadSummaryList() {
         const container = document.getElementById('studentMissingContainer');
         container.innerHTML = '<div style="color:#94a3b8; text-align:center; grid-column:1/-1;">資料載入中...</div>';
@@ -793,23 +796,23 @@ const firebaseConfig = {
             let itemsHtml = student.items.map(item => {
                 let icon = '❌';
                 let statusLabel = '未交';
-                let itemClass = 'missing-item-not_submitted';
+                let textColor = '#b91c1c';
 
                 if (item.status === 'incomplete') {
                     icon = '⚠️';
                     statusLabel = '有缺漏';
-                    itemClass = 'missing-item-incomplete';
+                    textColor = '#b06000';
                 } else if (item.status === 'leave') {
                     icon = '🔵';
                     statusLabel = '請假';
-                    itemClass = 'missing-item-leave';
+                    textColor = '#1d4ed8';
                 }
 
                 return `
-                    <li class="missing-item ${itemClass}" onclick="window.jumpToEditHw('${item.hwName}', '${item.registeredBy}')" title="點擊跳轉編輯此作業">
-                        <div style="display:flex; align-items:center; gap:6px;">
+                    <li class="missing-item" onclick="window.jumpToEditHw('${item.hwName}', '${item.registeredBy}')" title="點擊跳轉編輯此作業">
+                        <div class="missing-info" style="color: ${textColor};">
                             <span>${icon}</span>
-                            <span>[${item.dateStr || '2026-09-05'}] <strong>${item.hwName}</strong> (${statusLabel})</span>
+                            <span>[${item.dateStr || '2026-09-25'}] <strong>${item.hwName}</strong> (${statusLabel})</span>
                         </div>
                         <span class="registrar-tag">登記人: ${item.registeredBy || '導師'}</span>
                     </li>
