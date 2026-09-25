@@ -1,25 +1,219 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>作業繳交登記系統</title>
-  
-  <!-- ★ 網頁分頁的小圖標 (Favicon) 改為作業圖示 📝 -->
- <link rel="icon" type="image/png" href="favicon.png">
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  
-  <!-- Firebase SDKs -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    // ★ 新增了 deleteDoc 功能
-    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作業繳交登記系統</title>
+    
+    <link rel="icon" href="favicon.png" type="image/png">
+    <!-- SheetJS 用於讀取 Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+        
+        /* 響應式容器 */
+        .container { max-width: 1050px; margin: 0 auto; }
+        
+        /* 卡片通用樣式 */
+        .card { background: white; padding: 22px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #f1f5f9; }
+        .page-title { text-align: center; color: #2563eb; font-size: 22px; font-weight: bold; margin-bottom: 20px; }
 
-    // 1. 請替換為您的 Firebase 專屬金鑰
-   // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        /* 班級按鈕網格 */
+        .class-grid { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+        .class-btn { padding: 15px 28px; font-size: 18px; background: #eff6ff; color: #2563eb; border: 2px solid #2563eb; border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .class-btn:hover { background: #2563eb; color: white; }
+
+        /* 表單與按鈕 */
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #334155; font-size: 15px; }
+        .form-group select, .form-group input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; outline: none; background: white; }
+        .form-group select:focus, .form-group input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        
+        .btn-primary { padding: 12px 20px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-danger { padding: 12px 20px; background: #ef4444; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { width: 100%; padding: 10px; background: #e2e8f0; color: #475569; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-upload { background: #d97706; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; }
+
+        /* 頂部導航資訊欄 */
+        .user-header { display: flex; justify-content: space-between; align-items: center; }
+        .user-info { font-size: 16px; font-weight: bold; }
+        .btn-logout { padding: 6px 14px; background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+        /* 頁籤切換列 */
+        .tab-bar { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; }
+        .tab-item { flex: 1; text-align: center; padding: 14px; font-weight: bold; color: #64748b; cursor: pointer; font-size: 16px; position: relative; }
+        .tab-item.active { color: #2563eb; }
+        .tab-item.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: #2563eb; border-radius: 3px 3px 0 0; }
+
+        /* 缺交作業總表卡片與網格 */
+        .section-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .student-item-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between; }
+        .student-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 18px; font-weight: bold; }
+        .seat-badge { width: 28px; height: 28px; background: #dbeafe; color: #1e40af; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .missing-list { list-style: none; padding: 0; margin: 0; }
+        .missing-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 8px; border-top: 1px solid #f1f5f9; font-size: 14px; cursor: pointer; border-radius: 6px; transition: background 0.15s; }
+        .missing-item:hover { background: #f8fafc; }
+        .missing-info { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+        .registrar-tag { font-size: 12px; color: #94a3b8; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #f1f5f9; flex-shrink: 0; }
+
+        /* 作業項目列表樣式 */
+        .hw-bar-item { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid #2563eb; padding: 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .hw-info-title { font-weight: bold; font-size: 16px; color: #1e293b; }
+        .hw-info-sub { font-size: 13px; color: #64748b; margin-top: 3px; }
+
+        /* 學生點擊網格與 4 種狀態樣式 */
+        .clickable-student { padding: 14px 10px; border-radius: 10px; border: 2px solid #cbd5e1; text-align: center; cursor: pointer; user-select: none; transition: transform 0.1s; }
+        .clickable-student:active { transform: scale(0.96); }
+        .status-not_submitted { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+        .status-submitted { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+        .status-incomplete { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+        .status-leave { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+
+        /* Modal 視窗 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: 16px; width: 90%; max-width: 480px; }
+
+        /* 💻 電腦版適應媒體查詢 */
+        @media (min-width: 768px) {
+            body { padding: 30px; }
+            .login-card-layout { max-width: 480px; margin: 0 auto; }
+            .missing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+            .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+        }
+
+        /* 📱 手機版適應媒體查詢 */
+        @media (max-width: 767px) {
+            body { padding: 10px; }
+            .missing-grid { display: flex; flex-direction: column; gap: 12px; }
+            .student-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- 第一頁：選擇班級 + 匯入名單 -->
+    <div id="page1" class="card login-card-layout">
+        <div class="page-title">🏫 步驟 1：請選擇班級</div>
+        
+        <div id="classButtonsContainer" class="class-grid">
+            <span style="color:#888;">正在載入班級資料...</span>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+        <button class="btn-upload" id="openImportModalBtn">📥 匯入新班級 Excel 學生名單</button>
+    </div>
+
+    <!-- 第二頁：登入姓名與密碼 -->
+    <div id="page2" class="card login-card-layout" style="display: none;">
+        <div class="page-title">🔐 步驟 2：使用者登入</div>
+        
+        <div style="text-align:center; font-weight:bold; margin-bottom:15px; color:#2563eb;">
+            當前選擇班級：<span id="displaySelectedClass"></span>
+        </div>
+
+        <div class="form-group">
+            <label>請選擇姓名 / 身份</label>
+            <select id="userSelect">
+                <!-- 動態注入導師與學生選項 -->
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label id="pwdLabel">身分證末六碼 (密碼)</label>
+            <input type="password" id="loginPasswordInput" placeholder="請輸入身分證末六碼">
+        </div>
+        
+        <button class="btn-primary" id="loginBtn" style="width:100%;">登入系統 👉</button>
+        <button class="btn-secondary" id="backToPage1Btn">↺ 重新選擇班級</button>
+    </div>
+
+    <!-- 儀表板：包含作業登記模式與缺交總表 -->
+    <div id="dashboard" style="display: none;">
+        
+        <!-- 頂部資訊欄 -->
+        <div class="card user-header">
+            <div class="user-info">
+                📍 <span id="headerClassText" style="color:#2563eb;"></span> | 
+                使用者：<span id="headerUserText"></span>
+            </div>
+            <button class="btn-logout" id="logoutBtn">登出 / 切換</button>
+        </div>
+
+        <!-- 頁籤導航 -->
+        <div class="tab-bar">
+            <div class="tab-item" id="tab3Btn">✏️ 作業登記模式</div>
+            <div class="tab-item active" id="tab4Btn">📚 缺交作業總表</div>
+        </div>
+
+        <!-- 作業登記模式 -->
+        <div id="page3Content" style="display: none;">
+            <div class="card">
+                <div class="section-title">📂 作業項目管理</div>
+                <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                    <input type="text" id="newHwInput" placeholder="例如: 數學 / 數習" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px;">
+                    <button id="addHwBtn" class="btn-primary" style="padding:10px 18px;">＋ 新增</button>
+                </div>
+
+                <div id="hwBarsContainer"></div>
+            </div>
+
+            <!-- 學生登記勾選區 -->
+            <div id="markingArea" class="card" style="display: none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+                    <div style="font-weight:bold; font-size:17px;">✍️ 登記作業：<span id="currentHwTitle" style="color:#2563eb;"></span></div>
+                    
+                    <div style="display:flex; gap:8px;">
+                        <button id="deleteHwInMarkingBtn" class="btn-danger" style="display:none;">🗑️ 刪除項目</button>
+                        <button id="saveRecordsBtn" class="btn-primary">💾 儲存變更</button>
+                    </div>
+                </div>
+                <div style="font-size:13px; color:#64748b; margin-bottom:12px;">點擊切換：❌未交 ➔ ✅已交 ➔ ⚠️有缺漏 ➔ 🔵請假</div>
+                <div class="student-grid" id="studentGrid"></div>
+            </div>
+        </div>
+
+        <!-- 缺交作業總表 -->
+        <div id="page4Content">
+            <div class="section-title">📋 學生未完成清單</div>
+            <div id="studentMissingContainer" class="missing-grid">
+                <!-- 動態產生多欄缺交卡片 -->
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Excel 匯入 Modal -->
+<div class="modal-overlay" id="importModal">
+    <div class="modal-content">
+        <h3 style="margin-top:0; color:#d97706;">📥 匯入 Excel 學生名單</h3>
+        <p style="font-size:13px; color:#666; line-height:1.5;">
+            請確保 Excel 第一列欄位名稱精準包含：<br>
+            <strong>班級</strong>、<strong>座號</strong>、<strong>姓名</strong>、<strong>密碼</strong> (可填身分證末六碼)
+        </p>
+        
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="width:100%; margin:15px 0;">
+        <div id="importStatusText" style="font-size:13px; margin-bottom:15px; font-weight:bold;"></div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn-secondary" id="closeImportModalBtn" style="width:auto; margin:0;">取消</button>
+            <button id="startImportBtn" class="btn-upload" style="width:auto;">開始匯入</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, getDoc, doc, setDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 🔴 請替換為您的 Firebase 設定 🔴
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyBWyQkQ3maeT1fLTXzeENC00TdOWEfZ0MM",
   authDomain: "class-checklist-acbb3.firebaseapp.com",
@@ -30,338 +224,570 @@ const firebaseConfig = {
   measurementId: "G-JEPYMZVRN1"
 };
 
+    const MENTOR_PIN = "8888"; // 導師預設密碼
+
     const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
     const db = getFirestore(app);
 
-    let studentsList = []; 
-    let currentUser = null;
-    let currentUserInfo = null;
-    let currentTaskId = null;
-    let allTasks = [];
-    let allRecords = [];
+    let currentClass = "";
+    let currentUser = "";
+    let isMentor = false;
+    let currentHw = "";
+    let currentHwCreatedBy = "";
+    let currentStudents = [];
+    let studentStates = {};
+    let hwCreatedByMap = {}; // 快取紀錄每個作業的建立者
 
-    getDocs(collection(db, "students")).then(snapshot => {
-      studentsList = snapshot.docs.map(doc => doc.data());
-      studentsList.sort((a, b) => a.seatNum - b.seatNum);
-    });
-
-    const STATUS_MAP = {
-      'missing': { label: '❌ 未交', class: 'bg-red-100 text-red-700 border-red-300' },
-      'submitted': { label: '✅ 已交', class: 'bg-green-100 text-green-700 border-green-300' },
-      'issue': { label: '⚠️ 有缺漏', class: 'bg-yellow-100 text-yellow-700 border-yellow-400' }
-    };
-    const STATUS_NEXT = { 'missing': 'submitted', 'submitted': 'issue', 'issue': 'missing' };
-
-    const authSection = document.getElementById('auth-section');
-    const appSection = document.getElementById('app-section');
-    const userNameSpan = document.getElementById('user-name');
-    const teacherPanel = document.getElementById('teacher-panel');
-
-    document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
-
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        currentUser = user;
-        if (user.email === "teacher@class.local") {
-          currentUserInfo = { name: "導師", seatNum: 0, role: 'teacher' };
-          userNameSpan.textContent = "導師";
-          teacherPanel.classList.remove('hidden'); 
-        } else {
-          const q = query(collection(db, "students"), where("email", "==", user.email));
-          const querySnapshot = await getDocs(q);
-          if (!querySnapshot.empty) {
-            const studentData = querySnapshot.docs[0].data();
-            currentUserInfo = { name: studentData.name, seatNum: studentData.seatNum, role: 'student' };
-            userNameSpan.textContent = `${studentData.seatNum}號 ${studentData.name}`;
-          }
-          teacherPanel.classList.add('hidden'); 
+    function formatPassword(rawPwd) {
+        if (!rawPwd) return "";
+        let pwd = String(rawPwd).trim();
+        if (pwd.endsWith('.0')) pwd = pwd.slice(0, -2);
+        if (/^\d+$/.test(pwd) && pwd.length < 6) {
+            pwd = pwd.padStart(6, '0');
         }
-        authSection.classList.add('hidden');
-        appSection.classList.remove('hidden');
-        initDataListeners();
-      } else {
-        currentUser = null;
-        currentUserInfo = null;
-        authSection.classList.remove('hidden');
-        appSection.classList.add('hidden');
-      }
-    });
-
-    window.login = async () => {
-      const inputName = document.getElementById('login-name').value.trim();
-      const password = document.getElementById('login-password').value.trim();
-      if (!inputName || !password) return alert("請輸入姓名與身分證末六碼");
-
-      let targetEmail = "";
-      if (inputName === "導師" || inputName === "老師") targetEmail = "teacher@class.local";
-      else {
-        const student = studentsList.find(s => s.name === inputName);
-        if (!student) return alert("找不到該姓名，請確認導師已上傳名單，或無錯別字。");
-        targetEmail = student.email;
-      }
-      try { 
-        await setPersistence(auth, browserSessionPersistence);
-        await signInWithEmailAndPassword(auth, targetEmail, password); 
-      } 
-      catch (error) { alert("登入失敗：身分證末六碼不正確，或該帳號尚未開通"); }
-    };
-
-    window.logout = () => signOut(auth);
-
-    window.uploadExcel = () => {
-      const fileInput = document.getElementById('excel-file');
-      const file = fileInput.files[0];
-      if (!file) return alert("請先選擇 Excel 檔案！");
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, {type: 'array'});
-          const excelData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-          let count = 0;
-          for (let row of excelData) {
-            if (row['座號'] && row['姓名'] && row['虛擬信箱']) {
-              await setDoc(doc(db, "students", row['座號'].toString()), {
-                seatNum: parseInt(row['座號']), name: row['姓名'].toString().trim(), email: row['虛擬信箱'].toString().trim()
-              });
-              count++;
-            }
-          }
-          alert(`✅ 成功匯入 ${count} 筆學生資料！`);
-          fileInput.value = ""; 
-        } catch (err) { alert("讀取 Excel 失敗"); }
-      };
-      reader.readAsArrayBuffer(file);
-    };
-
-    window.createTask = async () => {
-      const date = document.getElementById('task-date').value;
-      const title = document.getElementById('task-title').value;
-      if (!date || !title) return alert("請輸入日期與項目名稱");
-      await setDoc(doc(db, "tasks", 'task_' + Date.now()), { 
-        date, 
-        title, 
-        createdAt: new Date().toISOString(),
-        createdByEmail: currentUser.email,        
-        createdByName: currentUserInfo.name       
-      });
-      document.getElementById('task-title').value = '';
-    };
-
-    // ★ 刪除功能核心邏輯
-    window.deleteTask = async () => {
-      if (!currentTaskId) return;
-      const currentTask = allTasks.find(t => t.id === currentTaskId);
-      if (!currentTask) return;
-
-      const confirmDelete = confirm(`⚠️ 確定要刪除「${currentTask.title}」嗎？\n刪除後，全班的繳交紀錄都會一併消失，且無法復原喔！`);
-      if (!confirmDelete) return;
-
-      try {
-        // 1. 刪除該事項底下的所有繳交紀錄
-        const recordsToDelete = allRecords.filter(r => r.taskId === currentTaskId);
-        for (let r of recordsToDelete) {
-          await deleteDoc(doc(db, "records", r.id));
-        }
-        // 2. 刪除該事項本身
-        await deleteDoc(doc(db, "tasks", currentTaskId));
-
-        alert("✅ 項目已成功刪除！");
-        document.getElementById('task-select').value = "";
-        currentTaskId = null;
-        document.getElementById('btn-delete-task').classList.add('hidden');
-        renderGrid();
-      } catch (error) {
-        console.error(error);
-        alert("刪除失敗，請確認您的網路連線。");
-      }
-    };
-
-    function initDataListeners() {
-      onSnapshot(collection(db, "students"), (snapshot) => {
-        studentsList = snapshot.docs.map(doc => doc.data()).sort((a, b) => a.seatNum - b.seatNum);
-        if (currentTaskId) renderGrid();
-        renderSummary();
-      });
-      onSnapshot(query(collection(db, "tasks"), orderBy("createdAt", "desc")), (snapshot) => {
-        allTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.date) - new Date(a.date)); 
-        renderTaskSelect();
-        renderSummary();
-      });
-      onSnapshot(collection(db, "records"), (snapshot) => {
-        allRecords = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (currentTaskId) renderGrid();
-        renderSummary();
-      });
+        return pwd;
     }
 
-    function renderTaskSelect() {
-      const select = document.getElementById('task-select');
-      const currentVal = select.value;
-      select.innerHTML = '<option value="">-- 請選擇要登記的項目 --</option>';
-      allTasks.forEach(task => {
-        const opt = document.createElement('option');
-        opt.value = task.id;
-        const creatorName = task.createdByName ? task.createdByName : '導師';
-        opt.textContent = `[${task.date}] ${task.title} (登記人：${creatorName})`;
-        select.appendChild(opt);
-      });
-      if (allTasks.some(t => t.id === currentVal)) select.value = currentVal;
-    }
+    window.addEventListener('DOMContentLoaded', async () => {
+        await loadClassButtons();
+    });
 
-    window.onTaskChange = () => { 
-      currentTaskId = document.getElementById('task-select').value; 
-      
-      // ★ 判斷是否顯示「刪除按鈕」
-      const currentTask = allTasks.find(t => t.id === currentTaskId);
-      const btnDelete = document.getElementById('btn-delete-task');
-      
-      if (currentTask) {
-        const isTeacher = currentUser.email === "teacher@class.local"; 
-        const isCreator = currentTask.createdByEmail === currentUser.email; 
-        if (isTeacher || isCreator) {
-          btnDelete.classList.remove('hidden'); // 顯示刪除按鈕
-        } else {
-          btnDelete.classList.add('hidden'); // 隱藏刪除按鈕
-        }
-      } else {
-        btnDelete.classList.add('hidden');
-      }
-
-      renderGrid(); 
-    };
-
-    function renderGrid() {
-      const grid = document.getElementById('student-grid');
-      if (!currentTaskId) return grid.innerHTML = '<div class="col-span-full text-center text-gray-500">請先在上方選擇一個項目</div>';
-      grid.innerHTML = '';
-
-      const currentTaskRecords = {};
-      allRecords.forEach(r => { if (r.taskId === currentTaskId) currentTaskRecords[r.seatNum] = r.status; });
-
-      const currentTask = allTasks.find(t => t.id === currentTaskId);
-      const isTeacher = currentUser.email === "teacher@class.local"; 
-      const isCreator = currentTask && currentTask.createdByEmail === currentUser.email; 
-      const canEdit = isTeacher || isCreator; 
-
-      studentsList.forEach((student) => {
-        const statusKey = currentTaskRecords[student.seatNum] || 'missing';
-        const statusInfo = STATUS_MAP[statusKey];
-        const cursorClass = canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60 grayscale-[30%]';
-
-        const card = document.createElement('div');
-        card.className = `p-3 border-2 rounded-lg flex flex-col items-center justify-between transition-all ${statusInfo.class} ${cursorClass}`;
-        card.innerHTML = `<div class="font-bold text-lg">${student.seatNum}</div><div class="text-sm my-1">${student.name}</div><div class="text-xs font-semibold px-2 py-1 rounded bg-white/50 text-center w-full">${statusInfo.label}</div>`;
+    async function loadClassButtons() {
+        const container = document.getElementById('classButtonsContainer');
+        const snap = await getDocs(collection(db, "students"));
         
-        card.onclick = () => {
-          if (canEdit) {
-            toggleStatus(student.seatNum, statusKey);
-          } else {
-            const creatorName = currentTask.createdByName ? currentTask.createdByName : '其他人';
-            alert(`⚠️ 權限不足！\n\n此項目是由【${creatorName}】建立的。\n只有建立者本人與導師可以修改繳交狀態。`);
-          }
-        };
-        grid.appendChild(card);
-      });
-    }
-
-    async function toggleStatus(seatNum, currentStatus) {
-      if (!currentTaskId) return;
-      await setDoc(doc(db, "records", `${currentTaskId}_${seatNum}`), {
-        taskId: currentTaskId, seatNum: seatNum, status: STATUS_NEXT[currentStatus],
-        updatedBy: currentUserInfo ? currentUserInfo.name : currentUser.email, updatedAt: new Date().toISOString()
-      });
-    }
-
-    window.switchTab = (tabName) => {
-      document.getElementById('tab-register').className = `w-1/2 py-3 border-b-4 transition-colors flex items-center justify-center gap-2 ${tabName==='register' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`;
-      document.getElementById('tab-summary').className = `w-1/2 py-3 border-b-4 transition-colors flex items-center justify-center gap-2 ${tabName==='summary' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'}`;
-      document.getElementById('view-register').classList.toggle('hidden', tabName !== 'register');
-      document.getElementById('view-summary').classList.toggle('hidden', tabName !== 'summary');
-    };
-
-    function renderSummary() {
-      const container = document.getElementById('summary-list');
-      if (allTasks.length === 0) return container.innerHTML = '<div class="text-center text-gray-500 p-6">目前還沒有新增任何事項。</div>';
-      container.innerHTML = '';
-      let hasAnyUnfinished = false;
-      
-      studentsList.forEach(student => {
-        const uncompleted = [];
-        allTasks.forEach(task => {
-          const record = allRecords.find(r => r.taskId === task.id && r.seatNum === student.seatNum);
-          const status = record ? record.status : 'missing';
-          const creatorName = task.createdByName ? task.createdByName : '導師';
-
-          if (status === 'missing') {
-            uncompleted.push(`<li class="flex items-center justify-between"><span class="text-red-600">❌ [${task.date}] ${task.title} (未交)</span><span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">登記人: ${creatorName}</span></li>`);
-          } else if (status === 'issue') {
-            uncompleted.push(`<li class="flex items-center justify-between"><span class="text-yellow-600">⚠️ [${task.date}] ${task.title} (缺漏)</span><span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">登記人: ${creatorName}</span></li>`);
-          }
+        const classSet = new Set();
+        snap.forEach(docSnap => {
+            if (docSnap.data().class) classSet.add(docSnap.data().class);
         });
-        
-        if (uncompleted.length > 0) {
-          hasAnyUnfinished = true;
-          const card = document.createElement('div');
-          card.className = "bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-3";
-          card.innerHTML = `<div class="font-bold text-lg mb-2 flex items-center border-b pb-2"><span class="bg-blue-100 text-blue-800 rounded-full w-8 h-8 flex items-center justify-center mr-2">${student.seatNum}</span>${student.name}</div><ul class="space-y-2 ml-2">${uncompleted.join('')}</ul>`;
-          container.appendChild(card);
+
+        const classes = Array.from(classSet).sort();
+        container.innerHTML = '';
+
+        if (classes.length === 0) {
+            container.innerHTML = '<span style="color:#888;">尚未匯入班級，請點擊下方按鈕上傳名單。</span>';
+            return;
         }
-      });
-      if (!hasAnyUnfinished) container.innerHTML = `<div class="text-center text-green-600 p-10 bg-green-50 rounded-lg border border-green-200">🎉 全班無缺交！</div>`;
+
+        classes.forEach(className => {
+            const btn = document.createElement('button');
+            btn.className = 'class-btn';
+            btn.innerText = `${className} 班`;
+            btn.onclick = () => selectClassAndGoToPage2(className);
+            container.appendChild(btn);
+        });
     }
-  </script>
-</head>
-<body class="bg-slate-50 min-h-screen text-slate-800">
-  <div id="auth-section" class="max-w-md mx-auto mt-20 p-6 bg-white rounded-xl shadow-md">
-    <h1 class="text-2xl font-bold mb-6 text-center text-blue-600">作業繳交系統登入</h1>
-    <div class="mb-4">
-      <label class="block text-gray-700 font-bold mb-1">學生姓名 / 導師</label>
-      <input type="text" id="login-name" placeholder="請輸入姓名" class="w-full p-2 border rounded">
-    </div>
-    <div class="mb-6">
-      <label class="block text-gray-700 font-bold mb-1">身分證末六碼 (密碼)</label>
-      <input type="password" id="login-password" placeholder="請輸入身分證末六碼" class="w-full p-2 border rounded">
-    </div>
-    <button onclick="login()" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-bold">登入系統</button>
-  </div>
-  
-  <div id="app-section" class="hidden max-w-4xl mx-auto p-4">
-    <div class="flex flex-wrap justify-between items-center bg-white p-4 rounded-lg shadow mb-4">
-      <div class="text-sm sm:text-base font-bold">目前使用者：<span id="user-name" class="font-normal text-blue-600"></span></div>
-      <button onclick="logout()" class="text-sm bg-gray-200 px-3 py-1 mt-2 sm:mt-0 rounded hover:bg-gray-300">登出</button>
-    </div>
-    <div id="teacher-panel" class="hidden bg-yellow-50 p-4 rounded-lg shadow mb-6 border border-yellow-300">
-      <h2 class="font-bold text-yellow-800 mb-2">📁 導師專用：匯入 Excel 學生名單</h2>
-      <div class="flex flex-col sm:flex-row gap-2"><input type="file" id="excel-file" accept=".xlsx, .xls" class="flex-1 p-1 border bg-white rounded"><button onclick="uploadExcel()" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 font-bold">上傳名單至資料庫</button></div>
-    </div>
-    
-    <div class="flex border-b border-gray-300 mb-6 font-bold text-lg">
-      <button id="tab-register" onclick="switchTab('register')" class="w-1/2 py-3 border-b-4 border-blue-600 text-blue-600 transition-colors flex items-center justify-center gap-2">✏️ 作業登記模式</button>
-      <button id="tab-summary" onclick="switchTab('summary')" class="w-1/2 py-3 border-b-4 border-transparent text-gray-500 hover:text-blue-500 transition-colors flex items-center justify-center gap-2">📚 缺交作業總表</button>
-    </div>
-    
-    <div id="view-register">
-      <div class="bg-white p-4 rounded-lg shadow mb-6 space-y-4">
-        <div class="flex flex-col sm:flex-row gap-2"><input type="date" id="task-date" class="p-2 border rounded"><input type="text" id="task-title" placeholder="項目名稱 (如：聯絡簿、數習)" class="flex-1 p-2 border rounded"><button onclick="createTask()" class="bg-green-600 text-white px-4 py-2 rounded whitespace-nowrap">新增事項</button></div>
-        <hr class="my-2 border-gray-200">
-        <!-- ★ 新增的刪除按鈕區塊 -->
-        <div class="flex items-center gap-2">
-          <select id="task-select" onchange="onTaskChange()" class="flex-1 p-2 border border-blue-300 rounded bg-blue-50">
-            <option value="">-- 請選擇要登記的項目 --</option>
-          </select>
-          <button id="btn-delete-task" onclick="deleteTask()" class="hidden bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 font-bold whitespace-nowrap transition-colors shadow">🗑️ 刪除</button>
-        </div>
-      </div>
-      <div id="student-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-        <div class="col-span-full text-center text-gray-500">請先在上方選擇一個項目</div>
-      </div>
-    </div>
-    
-    <div id="view-summary" class="hidden">
-      <div class="bg-white p-4 rounded-lg shadow mb-4"><h2 class="text-xl font-bold text-gray-800 mb-2">📋 學生未完成清單</h2><div id="summary-list" class="space-y-4"></div></div>
-    </div>
-  </div>
+
+    const importModal = document.getElementById('importModal');
+    document.getElementById('openImportModalBtn').onclick = () => importModal.style.display = 'flex';
+    document.getElementById('closeImportModalBtn').onclick = () => importModal.style.display = 'none';
+
+    document.getElementById('startImportBtn').onclick = async () => {
+        const fileInput = document.getElementById('excelFileInput');
+        const statusText = document.getElementById('importStatusText');
+
+        if (fileInput.files.length === 0) return alert("請先選擇 Excel 檔案！");
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        statusText.style.color = "blue";
+        statusText.innerText = "資料讀取與寫入中...";
+
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { raw: false });
+
+                const batch = writeBatch(db);
+                let count = 0;
+
+                json.forEach(row => {
+                    const className = String(row["班級"] || "").trim();
+                    const seat = String(row["座號"] || "").trim();
+                    const name = String(row["姓名"] || "").trim();
+                    const rawPwd = row["密碼"] || row["身分證末六碼"] || row["身分證號碼"] || "";
+                    const pwd = formatPassword(rawPwd);
+
+                    if (className && seat && name && pwd) {
+                        const docId = `${className}_${seat.padStart(2, '0')}`;
+                        batch.set(doc(db, "students", docId), { 
+                            class: className,
+                            seat: Number(seat), 
+                            name: name,
+                            password: pwd 
+                        });
+                        count++;
+                    }
+                });
+
+                await batch.commit();
+                statusText.style.color = "green";
+                statusText.innerText = `🎉 成功匯入 ${count} 筆學生名單與密碼！`;
+                setTimeout(() => {
+                    importModal.style.display = 'none';
+                    loadClassButtons();
+                }, 1200);
+
+            } catch (err) {
+                console.error(err);
+                statusText.style.color = "red";
+                statusText.innerText = "❌ 匯入失敗，請確認欄位格式！";
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    async function selectClassAndGoToPage2(className) {
+        currentClass = className;
+        document.getElementById('displaySelectedClass').innerText = `${currentClass} 班`;
+
+        const userSelect = document.getElementById('userSelect');
+        userSelect.innerHTML = '<option value="mentor">🧑‍🏫 導師</option>';
+
+        const q = query(collection(db, "students"), where("class", "==", currentClass));
+        const snap = await getDocs(q);
+        currentStudents = [];
+        snap.forEach(docSnap => currentStudents.push(docSnap.data()));
+        currentStudents.sort((a, b) => a.seat - b.seat);
+
+        currentStudents.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.seat;
+            opt.innerText = `${s.seat}號 🧑‍🎓 ${s.name}`;
+            userSelect.appendChild(opt);
+        });
+
+        document.getElementById('page1').style.display = 'none';
+        document.getElementById('page2').style.display = 'block';
+    }
+
+    document.getElementById('backToPage1Btn').onclick = () => {
+        document.getElementById('page2').style.display = 'none';
+        document.getElementById('page1').style.display = 'block';
+        document.getElementById('loginPasswordInput').value = '';
+    };
+
+    document.getElementById('loginBtn').onclick = () => {
+        const selectedValue = document.getElementById('userSelect').value;
+        const rawInputPassword = document.getElementById('loginPasswordInput').value.trim();
+
+        if (selectedValue === "mentor") {
+            if (rawInputPassword === MENTOR_PIN) {
+                currentUser = "導師";
+                isMentor = true;
+                enterDashboard();
+            } else {
+                alert("❌ 導師密碼錯誤！");
+            }
+        } else {
+            const student = currentStudents.find(s => String(s.seat) === String(selectedValue));
+            if (student) {
+                const inputPwd = formatPassword(rawInputPassword);
+                const dbPwd = formatPassword(student.password);
+                if (dbPwd && dbPwd === inputPwd) {
+                    currentUser = student.name;
+                    isMentor = false;
+                    enterDashboard();
+                } else {
+                    alert(`❌ 密碼錯誤！請確認身分證末六碼。`);
+                }
+            }
+        }
+    };
+
+    function enterDashboard() {
+        document.getElementById('page2').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+
+        document.getElementById('headerClassText').innerText = `${currentClass} 班`;
+        document.getElementById('headerUserText').innerText = isMentor ? `🧑‍🏫 ${currentUser}` : `🧑‍🎓 ${currentUser}`;
+
+        switchToPage4();
+    }
+
+    document.getElementById('logoutBtn').onclick = () => {
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('page1').style.display = 'block';
+        document.getElementById('loginPasswordInput').value = '';
+        loadClassButtons();
+    };
+
+    const tab3Btn = document.getElementById('tab3Btn');
+    const tab4Btn = document.getElementById('tab4Btn');
+    const page3Content = document.getElementById('page3Content');
+    const page4Content = document.getElementById('page4Content');
+
+    tab3Btn.onclick = switchToPage3;
+    tab4Btn.onclick = switchToPage4;
+
+    function switchToPage3() {
+        tab3Btn.className = 'tab-item active';
+        tab4Btn.className = 'tab-item';
+        page3Content.style.display = 'block';
+        page4Content.style.display = 'none';
+        loadHomeworkBars();
+    }
+
+    function switchToPage4() {
+        tab4Btn.className = 'tab-item active';
+        tab3Btn.className = 'tab-item';
+        page4Content.style.display = 'block';
+        page3Content.style.display = 'none';
+        loadSummaryList();
+    }
+
+    window.jumpToEditHw = (hwName, registeredBy) => {
+        const creator = hwCreatedByMap[hwName] || registeredBy || '導師';
+        const canManage = isMentor || creator === currentUser;
+
+        if (!canManage) {
+            alert(`⚠️ 「${hwName}」由 ${creator} 建立，僅建立者或導師可以進行登記與編輯！`);
+            return;
+        }
+
+        switchToPage3();
+        window.selectHw(hwName, creator);
+    };
+
+    // 4. 修改作業名稱功能 (更名時連動更新 records)
+    window.renameHw = async (oldHwName) => {
+        const creator = hwCreatedByMap[oldHwName] || '導師';
+        const canManage = isMentor || creator === currentUser;
+
+        if (!canManage) {
+            alert(`⚠️ 您無權限修改由 ${creator} 建立的作業名稱！`);
+            return;
+        }
+
+        const newHwName = prompt("請輸入新的作業名稱：", oldHwName);
+        if (!newHwName || newHwName.trim() === "" || newHwName.trim() === oldHwName) return;
+
+        const trimmedNewName = newHwName.trim();
+        const batch = writeBatch(db);
+
+        // A. 複製舊作業檔資料，建立新作業檔，刪除舊作業檔
+        const oldHwRef = doc(db, "assignments", `${currentClass}_${oldHwName}`);
+        const oldHwSnap = await getDoc(oldHwRef);
+        const oldData = oldHwSnap.exists() ? oldHwSnap.data() : { class: currentClass, createdBy: creator, dateStr: new Date().toISOString().split('T')[0] };
+
+        const newHwRef = doc(db, "assignments", `${currentClass}_${trimmedNewName}`);
+        batch.set(newHwRef, {
+            ...oldData,
+            hwName: trimmedNewName
+        });
+        batch.delete(oldHwRef);
+
+        // B. 批次更新所有相關角色的繳交紀錄
+        const q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", oldHwName));
+        const recSnap = await getDocs(q);
+        recSnap.forEach(d => {
+            const recData = d.data();
+            const newRecRef = doc(db, "records", `${currentClass}_${recData.seat}_${trimmedNewName}`);
+            batch.set(newRecRef, {
+                ...recData,
+                hwName: trimmedNewName
+            });
+            batch.delete(d.ref);
+        });
+
+        await batch.commit();
+        alert(`🎉 作業已成功由「${oldHwName}」重新命名為「${trimmedNewName}」！`);
+
+        if (currentHw === oldHwName) {
+            currentHw = trimmedNewName;
+            document.getElementById('currentHwTitle').innerText = trimmedNewName;
+        }
+
+        loadHomeworkBars();
+        loadSummaryList();
+    };
+
+    // 載入作業列表 (新增「✏️ 改名」按鈕)
+    async function loadHomeworkBars() {
+        const container = document.getElementById('hwBarsContainer');
+        const q = query(collection(db, "assignments"), where("class", "==", currentClass));
+        const snap = await getDocs(q);
+        container.innerHTML = '';
+        hwCreatedByMap = {};
+
+        if (snap.empty) {
+            container.innerHTML = '<div style="color:#94a3b8; text-align:center;">尚無作業項目，請在上方新增！</div>';
+            return;
+        }
+
+        snap.forEach(d => {
+            const data = d.data();
+            const hwName = data.hwName;
+            const createdBy = data.createdBy || '導師';
+            const dateStr = data.dateStr || '2026-09-05';
+
+            hwCreatedByMap[hwName] = createdBy;
+
+            const canManage = isMentor || createdBy === currentUser;
+
+            const item = document.createElement('div');
+            item.className = 'hw-bar-item';
+            item.innerHTML = `
+                <div>
+                    <div class="hw-info-title">📖 [${dateStr}] ${hwName}</div>
+                    <div class="hw-info-sub">登記人：<strong>${createdBy}</strong></div>
+                </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    ${canManage 
+                        ? `<button style="padding:6px 12px; background:#2563eb; color:white; border:none; border-radius:6px; cursor:pointer;" onclick="window.selectHw('${hwName}', '${createdBy}')">登記</button>` 
+                        : `<button style="padding:6px 12px; background:#cbd5e1; color:#64748b; border:none; border-radius:6px; cursor:not-allowed;" disabled>僅建立者可登記</button>`}
+                    
+                    ${canManage 
+                        ? `<button style="padding:6px 12px; background:#d97706; color:white; border:none; border-radius:6px; cursor:pointer;" onclick="window.renameHw('${hwName}')">✏️ 改名</button>` 
+                        : ''}
+
+                    ${canManage 
+                        ? `<button style="padding:6px 12px; background:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer;" onclick="window.deleteHw('${hwName}')">刪除</button>` 
+                        : ''}
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    // 新增作業條
+    document.getElementById('addHwBtn').onclick = async () => {
+        const hwName = document.getElementById('newHwInput').value.trim();
+        if (!hwName) return alert("請輸入作業名稱！");
+
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        await setDoc(doc(db, "assignments", `${currentClass}_${hwName}`), { 
+            class: currentClass, 
+            hwName: hwName, 
+            dateStr: todayStr,
+            createdBy: currentUser,
+            createdAt: new Date() 
+        });
+
+        hwCreatedByMap[hwName] = currentUser;
+        document.getElementById('newHwInput').value = '';
+        loadHomeworkBars();
+        window.selectHw(hwName, currentUser);
+    };
+
+    // 刪除作業
+    window.deleteHw = async (hwName) => {
+        const creator = hwCreatedByMap[hwName] || '導師';
+        const canManage = isMentor || creator === currentUser;
+
+        if (!canManage) {
+            alert(`⚠️ 您無權限刪除由 ${creator} 建立的作業！`);
+            return;
+        }
+
+        if (!confirm(`確定要刪除「${hwName}」這項作業嗎？\n⚠️ 此操作將連同全班所有繳交紀錄與缺交總表項目一併刪除！`)) return;
+
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "assignments", `${currentClass}_${hwName}`));
+
+        const q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", hwName));
+        const recSnap = await getDocs(q);
+        recSnap.forEach(d => batch.delete(d.ref));
+
+        await batch.commit();
+
+        alert(`已成功刪除「${hwName}」！`);
+        document.getElementById('markingArea').style.display = 'none';
+        loadHomeworkBars();
+        loadSummaryList();
+    };
+
+    document.getElementById('deleteHwInMarkingBtn').onclick = () => {
+        if (currentHw) window.deleteHw(currentHw);
+    };
+
+    window.selectHw = async (hwName, createdBy) => {
+        const creator = createdBy || hwCreatedByMap[hwName] || '導師';
+        const canManage = isMentor || creator === currentUser;
+
+        if (!canManage) {
+            alert(`⚠️ 「${hwName}」由 ${creator} 建立，您沒有權限登記或修改此作業！`);
+            document.getElementById('markingArea').style.display = 'none';
+            return;
+        }
+
+        currentHw = hwName;
+        currentHwCreatedBy = creator;
+        
+        document.getElementById('currentHwTitle').innerText = hwName;
+        document.getElementById('markingArea').style.display = 'block';
+
+        document.getElementById('deleteHwInMarkingBtn').style.display = 'inline-block';
+
+        const q = query(collection(db, "records"), where("class", "==", currentClass), where("hwName", "==", hwName));
+        const snap = await getDocs(q);
+        studentStates = {};
+        snap.forEach(d => studentStates[d.data().seat] = d.data().status);
+
+        renderStudentGrid();
+    };
+
+    // 1. 學生卡片 4 種狀態循環切換 (未交 ➔ 已交 ➔ 缺漏 ➔ 請假)
+    function renderStudentGrid() {
+        const grid = document.getElementById('studentGrid');
+        grid.innerHTML = '';
+
+        currentStudents.forEach(student => {
+            const status = studentStates[student.seat] || 'not_submitted';
+            const card = document.createElement('div');
+            card.className = `clickable-student status-${status}`;
+
+            let statusText = "❌ 未交";
+            if (status === 'submitted') statusText = "✅ 已交";
+            if (status === 'incomplete') statusText = "⚠️ 缺漏";
+            if (status === 'leave') statusText = "🔵 請假";
+
+            card.innerHTML = `
+                <div style="font-size:12px; opacity:0.8;">${student.seat} 號</div>
+                <div style="font-weight:bold; font-size:16px; margin:4px 0;">${student.name}</div>
+                <div style="font-size:12px; font-weight:bold;">${statusText}</div>
+            `;
+
+            card.onclick = () => {
+                const creator = hwCreatedByMap[currentHw] || currentHwCreatedBy;
+                const canManage = isMentor || creator === currentUser;
+
+                if (!canManage) {
+                    alert("⚠️ 您無權限修改他人建立的作業繳交狀況！");
+                    return;
+                }
+
+                if (status === 'not_submitted') studentStates[student.seat] = 'submitted';
+                else if (status === 'submitted') studentStates[student.seat] = 'incomplete';
+                else if (status === 'incomplete') studentStates[student.seat] = 'leave';
+                else studentStates[student.seat] = 'not_submitted';
+
+                renderStudentGrid();
+            };
+            grid.appendChild(card);
+        });
+    }
+
+    document.getElementById('saveRecordsBtn').onclick = async () => {
+        const creator = hwCreatedByMap[currentHw] || currentHwCreatedBy;
+        const canManage = isMentor || creator === currentUser;
+
+        if (!canManage) {
+            alert("⚠️ 您無權限儲存此作業的變更！");
+            return;
+        }
+
+        const batch = writeBatch(db);
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        currentStudents.forEach(s => {
+            const status = studentStates[s.seat] || 'not_submitted';
+            const ref = doc(db, "records", `${currentClass}_${s.seat}_${currentHw}`);
+            batch.set(ref, {
+                class: currentClass,
+                seat: s.seat,
+                name: s.name,
+                hwName: currentHw,
+                status: status,
+                dateStr: todayStr,
+                registeredBy: currentUser
+            });
+        });
+
+        await batch.commit();
+        alert(`🎉 「${currentHw}」登記已儲存！`);
+        document.getElementById('markingArea').style.display = 'none';
+        loadHomeworkBars();
+    };
+
+    // 2. & 3. 缺交總表依「欠繳數量」由多到少排序，且「請假」不計入缺交數量
+    async function loadSummaryList() {
+        const container = document.getElementById('studentMissingContainer');
+        container.innerHTML = '<div style="color:#94a3b8; text-align:center; grid-column:1/-1;">資料載入中...</div>';
+
+        const q = query(collection(db, "records"), where("class", "==", currentClass));
+        const snap = await getDocs(q);
+
+        let map = {};
+        currentStudents.forEach(s => map[s.seat] = { name: s.name, seat: s.seat, items: [], missingCount: 0 });
+
+        snap.forEach(d => {
+            const r = d.data();
+            // 已交 (submitted) 不呈現
+            if (r.status !== 'submitted' && map[r.seat]) {
+                map[r.seat].items.push(r);
+                // 只有「未交」與「有缺漏」算入欠繳數量 (請假不計入)
+                if (r.status === 'not_submitted' || r.status === 'incomplete') {
+                    map[r.seat].missingCount++;
+                }
+            }
+        });
+
+        container.innerHTML = '';
+
+        // 轉換為陣列，並篩選出有作業未完成者 (missingCount > 0)
+        let studentList = Object.values(map).filter(s => s.missingCount > 0);
+
+        // 2. 排序：缺交數量由多排到少 (missingCount 降序)；若數量相同，依座號升序
+        studentList.sort((a, b) => {
+            if (b.missingCount !== a.missingCount) {
+                return b.missingCount - a.missingCount;
+            }
+            return a.seat - b.seat;
+        });
+
+        if (studentList.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color:#22c55e; font-weight:bold; padding:30px; grid-column:1/-1;">🎉 本班目前沒有任何欠繳作業！</div>';
+            return;
+        }
+
+        studentList.forEach(student => {
+            const card = document.createElement('div');
+            card.className = 'student-item-card';
+
+            let itemsHtml = student.items.map(item => {
+                let icon = '❌';
+                let statusLabel = '未交';
+                let itemColor = '';
+
+                if (item.status === 'incomplete') {
+                    icon = '⚠️';
+                    statusLabel = '有缺漏';
+                } else if (item.status === 'leave') {
+                    icon = '🔵';
+                    statusLabel = '請假';
+                    itemColor = 'color: #1d4ed8;';
+                }
+
+                return `
+                    <li class="missing-item" onclick="window.jumpToEditHw('${item.hwName}', '${item.registeredBy}')" title="點擊跳轉編輯此作業">
+                        <div class="missing-info" style="${itemColor}">
+                            <span>${icon}</span>
+                            <span>[${item.dateStr || '2026-09-05'}] <strong>${item.hwName}</strong> (${statusLabel}) ✏️</span>
+                        </div>
+                        <span class="registrar-tag">登記人: ${item.registeredBy || '導師'}</span>
+                    </li>
+                `;
+            }).join('');
+
+            card.innerHTML = `
+                <div class="student-header">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="seat-badge">${student.seat}</div>
+                        <div>${student.name}</div>
+                    </div>
+                    <div style="font-size:13px; color:#ef4444; font-weight:bold;">缺 ${student.missingCount} 項</div>
+                </div>
+                <ul class="missing-list">
+                    ${itemsHtml}
+                </ul>
+            `;
+            container.appendChild(card);
+        });
+    }
+</script>
+
 </body>
 </html>
